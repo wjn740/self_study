@@ -16,14 +16,32 @@ import os
 
 import re
 
+import sys
+
+import getopt
+
 from configparser import ConfigParser
 from configparser import RawConfigParser
 import configparser
 
+#用于记录哪些产品参与对比
+compare_products_list = list()
 
+kernel_compare_list = list()
+product_compare_list = list()
+release_compare_list = list()
 
+TestCase_gloale_list = list()
 
-TestCase_gloale_list = set()
+class benchmark():
+    """flag mean that value is more bigger more better or more smaller more better."""
+    def __init__(self, name, value, flag):
+        self.name = name
+        self.value = value
+        self.flag = flag
+
+    def __repr__(self):
+        return ":".join([self.name, self.value])
 
 def search_list(objects_list, func):
     for x in objects_list:
@@ -99,14 +117,15 @@ def read_data_perf_view_with_where(where_string):
         print(select_string)
         query = (select_string)
         cursor.execute(query)
-        testcase_list=set()
+        testcase_list=list()
         for (submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version) in cursor:
             #print(submission_id, arch, product, release, host, testsuite, test_time, testcase, kernel_version)
-            testcase_list.add(TestCase(submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version))
+            testcase_list.append(TestCase(submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version))
 
 
-        search_list(testcase_list, lambda x: print(x.testsuite, x.testcase, x.host, x.kernel_long_version, x.product, x.release))
+        search_list(testcase_list, lambda x: print(x.testsuite, x.testcase, x.host, x.kernel_long_version, x.product, x.release, x.benchmark))
         cnx.close()
+        return testcase_list
 #================================DATABASE==============================================================================================
 class TestCase():
     def __init__(self, submission_id="", arch="", product="", release="", host="", log_url="", testsuite="", test_time="", testcase="", kernel_version=""):
@@ -121,14 +140,94 @@ class TestCase():
         self.testcase = testcase
         self.kernel_version = kernel_version
         self.kernel_long_version = self.read_kernel_long_version()
+        self.testcase_benchmark()
 
     def __repr__(self):
-        return self.testcase
+        return "<"+self.testcase+">"
 
     def read_testcase(self):
         f = urllib.request.urlopen(self.log_url+"/"+self.testcase)
         for line in f:
             print(line)
+
+    def testcase_benchmark(self):
+        f = urllib.request.urlopen(self.log_url+"/"+self.testcase)
+        if self.testcase == 'reaim-ioperf':
+            self.benchmark_reaim_ioperf()
+            return
+        if self.testcase == 'sysbench-cpu':
+            return
+        if self.testcase == 'sysbench-threads':
+            return
+        if self.testcase == 'sysbench-memory':
+            return
+        if self.testcase == 'sysbench-mutex':
+            return
+        if self.testcase == 'sysbench-oltp':
+            return
+        if self.testcase == 'tiobench-doublemem-async':
+            return
+        if self.testcase == 'bonnie++-async':
+            return
+        if self.testcase == 'bonnie++-fsync':
+            return
+        if self.testcase == 'dbench4-async':
+            return
+        if self.testcase == 'dbench4-fsync':
+            return
+        if self.testcase == 'kernbench':
+            return
+        if self.testcase == 'libmicro-contextswitch':
+            return
+        if self.testcase == 'libmicro-file':
+            return
+        if self.testcase == 'libmicro-memory':
+            return
+        if self.testcase == 'libmicro-process':
+            return
+        if self.testcase == 'libmicro-regular':
+            return
+        if self.testcase == 'libmicro-socket':
+            return
+        if self.testcase == 'lmbench-bcopy':
+            return
+        if self.testcase == 'lmbench-ctx':
+            return
+        if self.testcase == 'lmbench-file':
+            return
+        if self.testcase == 'lmbench-local':
+            return
+        if self.testcase == 'lmbench-mem':
+            return
+        if self.testcase == 'lmbench-ops':
+            return
+        if self.testcase == 'lmbench-syscall':
+            return
+        if self.testcase == 'netperf-fiber-tcp':
+            return
+        if self.testcase == 'netperf-fiber-udp':
+            return
+        if self.testcase == 'netperf-fiber-tcp6':
+            return
+        if self.testcase == 'netperf-fiber-udp6':
+            return
+        if self.testcase == 'netperf-loop-tcp':
+            return
+        if self.testcase == 'netserver-start':
+            return
+        if self.testcase == 'netperf-loop-udp':
+            return
+        if self.testcase == 'pgbench-small-ro':
+            return
+        if self.testcase == 'pgbench-small-rw':
+            return
+        if self.testcase == 'iozone-doublemem-async':
+            return
+        if self.testcase == 'iozone-doublemem-fsync':
+            return
+        if self.testcase == 'qa_siege_performance':
+            return
+
 
     def read_kernel_long_version(self):
         with urllib.request.urlopen(self.log_url+"/"+'kernel') as response:
@@ -156,6 +255,18 @@ class TestCase():
                 if flavor and major and minor:
                     break
             return "-".join([major, minor, flavor ])
+
+
+    def benchmark_reaim_ioperf(self):
+        pattern=re.compile(b'Max Jobs per Minute ([0-9].*\.*[0-9]*)')
+        self.benchmark = list()
+        for line in urllib.request.urlopen(self.log_url+"/"+self.testcase):
+            m = pattern.match(line)
+            if m:
+                value=str(m.group(1), 'utf-8')
+                self.benchmark.append(benchmark('Jobs_per_Minute', value, 1))
+                continue
+
 
 
 
@@ -244,45 +355,79 @@ def read_database_init_data_pool():
         cursor.execute(query)
         for (submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version) in cursor:
             arch_set.add(arch)
-            product_set.add(product)
-            release_set.add(release)
             host_set.add(host)
             testsuite_set.add(testsuite)
             testcase_set.add(testcase)
-            kernel_version_set.add(kernel_version)
             #print("submission_id={}, arch={}, product={}, release={}, host={}, log_url={}, testsuite={}, testcase={}, kernel_version={}".format(submission_id, arch, product, release, host, log_url, testsuite, testcase, kernel_version))
 
 #Don't do create object at here.
             #TestCase(submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version)
 
+        query = ("SELECT distinct `kernel_version`, `product`, `release` from performance_view")
+        cursor.execute(query)
+        i=0
+        table=list()
+        for (kernel_version, product, release) in cursor:
+            table.append([kernel_version, product, release])
+            kernel_version_set.add(kernel_version)
+            product_set.add(product)
+            release_set.add(release)
+
+            print(i, table[i])
+            i+=1
         cnx.close()
+        compare_product_index_list=input("Please give your want products(eg. 1,3):").split(",")
+        print(compare_product_index_list)
+        for index in compare_product_index_list:
+            try:
+                compare_products_list.append(table[int(index)])
+                kernel_compare_list.append(table[int(index)][0])
+                product_compare_list.append(table[int(index)][1])
+                release_compare_list.append(table[int(index)][2])
+            except IndexError:
+                sys.stderr.write("choose error, total amount: "+str(len(table))+"\n"+"out of list!!\n")
+                sys.exit(1)
+        print(compare_products_list)
+
+#---------------START-------------------------------
+args = sys.argv[1:]
+
+optlist, args = getopt.getopt(args,'k:p:r:s:t:h:a:',['kernel', 'product', 'release', 'testsuite', 'testcase', 'host', 'arch'])
+
+for o,v in optlist:
+    if o in ("-k", "--kernel"):
+        kernel_compare_list = v.split(",")
+    if o in ("-p", "--product"):
+        product_compare_list = v.split(",")
+    if o in ("-r", "--release"):
+        release_compare_list = v.split(",")
+    if o in ("-s", "--testsuite"):
+        testsuite_compare_list = v.split(",")
+    if o in ("-t", "--testcase"):
+        testcase_compare_list = v.split(",")
+    if o in ("-h", "--host"):
+        host_compare_list = v.split(",")
+    if o in ("-a", "--arch"):
+        arch_compare_list = v.split(",")
 
 read_database_init_data_pool()
-print(kernel_version_set)
-kernel_input = input("[kernel]:")
+
+
+
+if not compare_products_list:
+    sys.exit(1)
+
 print(testcase_set)
 testcase_input = input("[testcase]:")
 print(testsuite_set)
 testsuite_input = input("[testsuite]:")
 print(host_set)
 host_input = input("[host]:")
-if not kernel_input:
-    print(release_set)
-    release_input = input("[release]:")
-    print(product_set)
-    product_input = input("[product]:")
 print(arch_set)
 arch_input = input("[arch]:")
-kernel_compare_list = kernel_input.split(",")
 testcase_compare_list = testcase_input.split(",")
 testsuite_compare_list = testsuite_input.split(",")
 host_compare_list = host_input.split(",")
-if not kernel_input:
-    release_compare_list = release_input.split(",")
-    product_compare_list = product_input.split(",")
-else:
-    release_compare_list = [""]
-    product_compare_list = [""]
 arch_compare_list = arch_input.split(",")
 
 
@@ -297,14 +442,17 @@ arch_compare_list = arch_input.split(",")
 
 
 #print("Hello,world!")
-for k,tc,ts,h,r,p,a in product(kernel_compare_list, testcase_compare_list, testsuite_compare_list, host_compare_list, release_compare_list, product_compare_list, arch_compare_list):
+for tc,ts,h,a in product(testcase_compare_list, testsuite_compare_list, host_compare_list, arch_compare_list):
     #print("Hello,world!")
     #print(k, tc, ts, h, r, p, a)
-    if k or tc or ts or h or r or p or a:
-        where_string=select_where_string(k, tc, ts, h, r, p, a)
-        read_data_perf_view_with_where(where_string)
+    for k, p, r in compare_products_list:
+        if k or tc or ts or h or r or p or a:
+            where_string=select_where_string(k, tc, ts, h, r, p, a)
+            TestCase_gloale_list.append(read_data_perf_view_with_where(where_string))
 
 
+
+print(TestCase_gloale_list)
     #for testcase in TestCase_gloale_list:
     #    if k == testcase.kernel_version and tc == testcase.testcase and ts == testcase.testsuite and h == testcase.host and r == testcase.release and p == testcase.product and a == testcase.arch:
     #        print(k, tc, ts, h, r, p, a)
