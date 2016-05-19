@@ -376,6 +376,10 @@ def read_database_init_data_pool():
             print(i, table[i])
             i+=1
         cnx.close()
+
+        if compare_products_list:
+            return
+
         compare_product_index_list=input("Please give your want products(eg. 1,3):").split(",")
         print(compare_product_index_list)
         for index in compare_product_index_list:
@@ -392,9 +396,9 @@ def read_database_init_data_pool():
 #---------------START-------------------------------
 args = sys.argv[1:]
 
-optlist, args = getopt.getopt(args,'k:p:r:s:t:h:a:',['kernel', 'product', 'release', 'testsuite', 'testcase', 'host', 'arch'])
+optlist, args = getopt.getopt(args,'k:p:r:s:t:h:a:',['kernel=', 'product=', 'release=', 'testsuite=', 'testcase=', 'host=', 'arch='])
 
-for o,v in optlist:
+for o, v in optlist:
     if o in ("-k", "--kernel"):
         kernel_compare_list = v.split(",")
     if o in ("-p", "--product"):
@@ -410,6 +414,12 @@ for o,v in optlist:
     if o in ("-a", "--arch"):
         arch_compare_list = v.split(",")
 
+if kernel_compare_list and product_compare_list and release_compare_list:
+    print("Choosed product set:")
+    for k, p, r in zip(kernel_compare_list, product_compare_list, release_compare_list):
+        print(",".join([k,p,r]))
+        compare_products_list.append([k,p,r])
+
 read_database_init_data_pool()
 
 
@@ -418,17 +428,21 @@ if not compare_products_list:
     sys.exit(1)
 
 print(testcase_set)
-testcase_input = input("[testcase]:")
+if not testcase_compare_list:
+    testcase_input = input("[testcase]:")
+    testcase_compare_list = testcase_input.split(",")
 print(testsuite_set)
-testsuite_input = input("[testsuite]:")
+if not testsuite_compare_list:
+    testsuite_input = input("[testsuite]:")
+    testsuite_compare_list = testsuite_input.split(",")
 print(host_set)
-host_input = input("[host]:")
+if not host_compare_list:
+    host_input = input("[host]:")
+    host_compare_list = host_input.split(",")
 print(arch_set)
-arch_input = input("[arch]:")
-testcase_compare_list = testcase_input.split(",")
-testsuite_compare_list = testsuite_input.split(",")
-host_compare_list = host_input.split(",")
-arch_compare_list = arch_input.split(",")
+if not arch_compare_list:
+    arch_input = input("[arch]:")
+    arch_compare_list = arch_input.split(",")
 
 
 
@@ -452,7 +466,7 @@ for tc,ts,h,a in product(testcase_compare_list, testsuite_compare_list, host_com
 
 
 
-print(TestCase_gloale_list)
+print("TestCase_gloale_list=", TestCase_gloale_list)
     #for testcase in TestCase_gloale_list:
     #    if k == testcase.kernel_version and tc == testcase.testcase and ts == testcase.testsuite and h == testcase.host and r == testcase.release and p == testcase.product and a == testcase.arch:
     #        print(k, tc, ts, h, r, p, a)
