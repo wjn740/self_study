@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import code
+
 import pandas as pd
 
 import numpy as np
@@ -571,6 +573,24 @@ for tc,ts,h,a in product(testcase_compare_list, testsuite_compare_list, host_com
 print("TestCase_gloale_list=", TestCase_gloale_list)
 
 #==========================STAGE II============================
+def format_football(football):
+    a=len(football.columns)
+    c=int(a/2)
+    d=len(football.index)
+
+    for c1 in range(a-c, a):
+        for d1 in range(0, d, 1):
+            if 'mean' in football.index[d1] and 'Time' in football.index[d1]:
+                try:
+                    i = football.iloc[d1,c1] = 100 * (football.iloc[d1, c1-c-1] / football.iloc[d1,c] - 1)
+                    if i < -10:
+                        football.iloc[d1,c1] ="{:0.4f}*".format(football.iloc[d1,c1])
+
+                except IndexError:
+                    print("football.iloc[d1,c1] = 100 * (football.iloc[c1-c-1,d1] / football.iloc[c,d1] - 1)")
+                    sys.exit(2)
+
+
 class statistics_node():
     """this class will make a statistics node for the list, the list will be use for statistics table"""
     def __init__(self, _list):
@@ -656,7 +676,25 @@ data=read_statistics_list_make_statistics_data(product_statistics_lists)
 
 pd.set_option('display.width', 1000)
 football = pd.DataFrame(data, index=product_statistics_lists[0].indexs)
+football.style.format({'ratio1': "{:0.4f}", 'ratio2': "{:0.4f}"})
+
+#def highlight_test_failed(s):
+#    for v in s:
+#        if v < -10:
+#            return ['frontground-color: red']
+
+a=len(football.columns)
+b=a
+for l in range(1, a, 1):
+    football.insert(b, 'ratio'+str(l),100 * (football[product_statistics_lists[-l+1].name] / football[product_statistics_lists[-l].name] - 1))
+    b+=1
+
+
+format_football(football)
+
 print(football)
+code.interact(local=locals())
+
 
     #for testcase in TestCase_gloale_list:
     #    if k == testcase.kernel_version and tc == testcase.testcase and ts == testcase.testsuite and h == testcase.host and r == testcase.release and p == testcase.product and a == testcase.arch:
