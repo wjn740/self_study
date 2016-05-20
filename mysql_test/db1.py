@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 
+import pandas as pd
+
+import numpy as np
+
+import matplotlib.pyplot as plt
+
 import mysql.connector
+
+import collections
+
+from collections import OrderedDict
 
 from mysql.connector import errorcode
 
@@ -20,6 +30,8 @@ import sys
 
 import getopt
 
+import statistics
+
 from configparser import ConfigParser
 from configparser import RawConfigParser
 import configparser
@@ -30,8 +42,30 @@ compare_products_list = list()
 kernel_compare_list = list()
 product_compare_list = list()
 release_compare_list = list()
+testcase_compare_list= list()
+testsuite_compare_list= list()
+arch_compare_list = list()
+host_compare_list = list()
+
 
 TestCase_gloale_list = list()
+
+def read_statistics_list_make_statistics_data(a_list):
+    data=OrderedDict()
+    for l in a_list:
+        data[l.name]=l.values()
+    #data = {
+    #        'adfas': [123,123,123,123,123],
+    #        'axxxdfas': [123,123,123,123,123],
+    #        'a234s': [123,123,123,123,123],
+    #        'ad__s': [123,123,123,123,123],
+    #        }
+    return data
+
+
+
+
+
 
 class benchmark():
     """flag mean that value is more bigger more better or more smaller more better."""
@@ -41,7 +75,16 @@ class benchmark():
         self.flag = flag
 
     def __repr__(self):
-        return ":".join([self.name, self.value])
+        #return ":".join([self.name, self.value])
+        return "<benchmark object>"
+
+    def __add__(self, other):
+        if (self.name != other.name):
+            raise TypeError
+        if (self.flag != other.flag):
+            raise TypeError
+        value = self.value + other.value
+        return benchmark(self.name, value, self.flag)
 
 def search_list(objects_list, func):
     for x in objects_list:
@@ -55,45 +98,45 @@ def select_where_string(k, tc, ts, h, r, p, a):
     if k:
         where_string="".join([where_string, " `kernel_version` = \'"+k+"\' "])
         start = False
-    print(where_string)
+    #print(where_string)
     if tc:
         if start == False:
             where_string="".join([where_string, "and"])
         where_string="".join([where_string, " `testcase` = '"+tc+"' "])
         start = False
-    print(where_string)
+    #print(where_string)
 
     if ts:
         if start == False:
             where_string="".join([where_string, "and"])
         where_string="".join([where_string, " `testsuite` = '"+ts+"' "])
         start = False
-    print(where_string)
+    #print(where_string)
 
     if h:
         if start == False:
             where_string="".join([where_string, "and"])
         where_string="".join([where_string, " `host` = '"+h+"' "])
         start = False
-    print(where_string)
+    #print(where_string)
 
     if r:
         if start == False:
             where_string="".join([where_string, "and"])
         where_string="".join([where_string, " `release` = '"+r+"' "])
         start = False
-    print(where_string)
+    #print(where_string)
     if p:
         if start == False:
             where_string="".join([where_string, "and"])
         where_string="".join([where_string, " `product` = '"+p+"' "])
         start = False
-    print(where_string)
+    #print(where_string)
     if a:
         if start == False:
             where_string="".join([where_string, "and"])
         where_string="".join([where_string, " `arch` = '"+a+"' "])
-    print(where_string)
+    #print(where_string)
     return where_string
 
 
@@ -123,7 +166,7 @@ def read_data_perf_view_with_where(where_string):
             testcase_list.append(TestCase(submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version))
 
 
-        search_list(testcase_list, lambda x: print(x.testsuite, x.testcase, x.host, x.kernel_long_version, x.product, x.release, x.benchmark))
+        #search_list(testcase_list, lambda x: print(x.testsuite, x.testcase, x.host, x.kernel_long_version, x.product, x.release, x.benchmark))
         cnx.close()
         return testcase_list
 #================================DATABASE==============================================================================================
@@ -141,6 +184,8 @@ class TestCase():
         self.kernel_version = kernel_version
         self.kernel_long_version = self.read_kernel_long_version()
         self.testcase_benchmark()
+
+
 
     def __repr__(self):
         return "<"+self.testcase+">"
@@ -168,14 +213,18 @@ class TestCase():
         if self.testcase == 'tiobench-doublemem-async':
             return
         if self.testcase == 'bonnie++-async':
+            self.benchmark_bonniepp()
             return
         if self.testcase == 'bonnie++-fsync':
+            self.benchmark_bonniepp()
+            return
             return
         if self.testcase == 'dbench4-async':
             return
         if self.testcase == 'dbench4-fsync':
             return
         if self.testcase == 'kernbench':
+            self.benchmark_kernbench()
             return
         if self.testcase == 'libmicro-contextswitch':
             return
@@ -258,14 +307,40 @@ class TestCase():
 
 
     def benchmark_reaim_ioperf(self):
-        pattern=re.compile(b'Max Jobs per Minute ([0-9].*\.*[0-9]*)')
         self.benchmark = list()
+        pattern=re.compile(b'Max Jobs per Minute ([0-9].*\.*[0-9]*)')
         for line in urllib.request.urlopen(self.log_url+"/"+self.testcase):
             m = pattern.match(line)
             if m:
                 value=str(m.group(1), 'utf-8')
                 self.benchmark.append(benchmark('Jobs_per_Minute', value, 1))
                 continue
+
+    def benchmark_bonniepp(self):
+        self.benchmark = list()
+        pattern=re.compile(b'^Machine')
+        with urllib.request.urlopen(self.log_url+"/"+self.testcase) as page:
+            g = io.BufferedReader(page)
+            t = io.TextIOWrapper(g, 'utf-8')
+            for line in t:
+                pattern=re.compile('Machine .*Size')
+                m = pattern.match(line)
+                print(line)
+                if m:
+                    line=next(t).split()
+                    self.benchmark.append(benchmark('Sequential_Output#Per_char#K/s', line[2], 1))
+                    self.benchmark.append(benchmark('Sequential_Output#Block#K/s', line[4], 1))
+                    self.benchmark.append(benchmark('Sequential_Output#Rewrite#K/s', line[6], 1))
+                    self.benchmark.append(benchmark('Sequential_Input#Per_char#K/s', line[8], 1))
+                    self.benchmark.append(benchmark('Sequential_Input#Block#K/s', line[10], 1))
+                    self.benchmark.append(benchmark('Random#Seeks#sec', line[12], -1))
+                    break
+
+
+
+
+
+
 
 
 
@@ -467,6 +542,89 @@ for tc,ts,h,a in product(testcase_compare_list, testsuite_compare_list, host_com
 
 
 print("TestCase_gloale_list=", TestCase_gloale_list)
+
+#==========================STAGE II============================
+class statistics_node():
+    """this class will make a statistics node for the list, the list will be use for statistics table"""
+    def __init__(self, _list):
+        self.name = "/".join([_list[0].product, _list[0].release, _list[0].kernel_long_version])
+        self.data = _list
+        self.benchmarks = OrderedDict()
+        self.benchmarks_init()
+        #self.print_benchmarks()
+
+    def benchmarks_init(self):
+        _tmp_dict=dict()
+        for tc in self.data:
+            for bm in tc.benchmark:
+                if bm.name in _tmp_dict:
+                    _tmp_dict[bm.name].append(float(bm.value))
+                else:
+                    _tmp_dict[bm.name] = [float(bm.value)]
+        for k, v in _tmp_dict.items():
+            self.benchmarks[k]=OrderedDict()
+            self.benchmarks[k]['mean']=statistics.mean(v)
+            self.benchmarks[k]['sum']=sum(v)
+            self.benchmarks[k]['max']=max(v)
+            self.benchmarks[k]['min']=min(v)
+            self.benchmarks[k]['stddev']=statistics.stdev(v)
+            self.benchmarks[k]['count']=len(v)
+
+
+    def print_benchmarks(self):
+        print(self.benchmarks)
+    def __repr__(self):
+        return self.name
+
+    def values(self):
+        self.indexs=list()
+        values=list()
+        for k,v in self.benchmarks.items():
+            for k1,v1 in v.items():
+                self.indexs.append(str(k)+'/'+str(k1))
+                values.append(v1)
+
+        #print(','.join(str(self.benchmarks[k] for k in self.benchmarks.keys())))
+        return values
+
+    def __str__(self):
+        self.indexs=list()
+        values=list()
+        for k,v in self.benchmarks.items():
+            for k1,v1 in v.items():
+                self.indexs.append(str(k)+str(k1))
+                values.append(v1)
+
+        #print(','.join(str(self.benchmarks[k] for k in self.benchmarks.keys())))
+        return str(values)
+
+    def mean(self):
+        pass
+
+    def _sum(self, _list):
+        pass
+    def stddev(self, _list):
+        pass
+    def cov(self, _list):
+        pass
+    def _min(self, _list):
+        pass
+    def _max(self, _list):
+        pass
+
+product_statistics_lists=list()
+for l in TestCase_gloale_list:
+    #print(compare_products_list[TestCase_gloale_list.index(l)][0] == l[0].kernel_version)
+    product_statistics_lists.append(statistics_node(l))
+
+#print(product_statistics_lists)
+
+data=read_statistics_list_make_statistics_data(product_statistics_lists)
+
+pd.set_option('display.width', 1000)
+football = pd.DataFrame(data, index=product_statistics_lists[0].indexs)
+print(football)
+
     #for testcase in TestCase_gloale_list:
     #    if k == testcase.kernel_version and tc == testcase.testcase and ts == testcase.testsuite and h == testcase.host and r == testcase.release and p == testcase.product and a == testcase.arch:
     #        print(k, tc, ts, h, r, p, a)
