@@ -305,6 +305,34 @@ class TestCase():
                     break
             return "-".join([major, minor, flavor ])
 
+    def benchmark_kernbench(self):
+        self.benchmark = list()
+        with urllib.request.urlopen(self.log_url+"/"+self.testcase) as page:
+            g = io.BufferedReader(page)
+            t = io.TextIOWrapper(g, 'utf-8')
+            for line in t:
+                pattern1=re.compile('^Elapsed Time *(\d*)')
+                pattern2=re.compile('^Context Switches *(\d*)')
+                pattern3=re.compile('^Half load -j (\d*) run number')
+                pattern4=re.compile('^Optimal load -j (\d*) run number')
+                m1 = pattern1.match(line)
+                m2 = pattern2.match(line)
+                m3 = pattern3.match(line)
+                m4 = pattern4.match(line)
+                if m3:
+                    jobs=str(m3.group(1))
+                if m4:
+                    jobs=str(m4.group(1))
+                if m1:
+                    #print(m1.group(1))
+                    self.benchmark.append(benchmark('Jobs'+jobs+'/'+'Elapsed_Time', float(m1.group(1)), -1))
+                    continue
+                if m2:
+                    #print(m2.group(1))
+                    self.benchmark.append(benchmark('Jobs'+jobs+'/'+'Context_Switch', float(m2.group(1)), 1))
+                    continue
+
+
 
     def benchmark_reaim_ioperf(self):
         self.benchmark = list()
@@ -325,7 +353,6 @@ class TestCase():
             for line in t:
                 pattern=re.compile('Machine .*Size')
                 m = pattern.match(line)
-                print(line)
                 if m:
                     line=next(t).split()
                     self.benchmark.append(benchmark('Sequential_Output#Per_char#K/s', line[2], 1))
@@ -547,7 +574,12 @@ print("TestCase_gloale_list=", TestCase_gloale_list)
 class statistics_node():
     """this class will make a statistics node for the list, the list will be use for statistics table"""
     def __init__(self, _list):
-        self.name = "/".join([_list[0].product, _list[0].release, _list[0].kernel_long_version])
+        try:
+            self.name = "/".join([_list[0].product, _list[0].release, _list[0].kernel_long_version])
+        except IndexError as err:
+            return
+
+
         self.data = _list
         self.benchmarks = OrderedDict()
         self.benchmarks_init()
@@ -615,7 +647,8 @@ class statistics_node():
 product_statistics_lists=list()
 for l in TestCase_gloale_list:
     #print(compare_products_list[TestCase_gloale_list.index(l)][0] == l[0].kernel_version)
-    product_statistics_lists.append(statistics_node(l))
+    if l:
+        product_statistics_lists.append(statistics_node(l))
 
 #print(product_statistics_lists)
 
