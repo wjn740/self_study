@@ -7,6 +7,7 @@ create view performance_view as select
     f.log_url, 
     g.testsuite, 
     h.test_time,
+    h.failed,
     i.testcase,
     j.kernel_version 
     from submission a 

@@ -163,7 +163,7 @@ def read_data_perf_view_with_where(where_string):
         query = (select_string)
         cursor.execute(query)
         testcase_list=list()
-        for (submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version) in cursor:
+        for (submission_id, arch, product, release, host, log_url, testsuite, test_time, failed, testcase, kernel_version) in cursor:
             #print(submission_id, arch, product, release, host, testsuite, test_time, testcase, kernel_version)
             testcase_list.append(TestCase(submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version))
 
@@ -393,7 +393,7 @@ testsuite_set = set()
 kernel_version_set = set()
 testcase_set = set()
 
-def read_database_init_data_pool():
+def read_database_init_data_pool(query, dataset, field):
     try:
         cnx = mysql.connector.connect(**config)
     except mysql.connector.Error as err:
@@ -454,21 +454,32 @@ def read_database_init_data_pool():
 #    for h in cursor:
 #        kernel_version_set.add(h[0])
 #    print(kernel_version_set)
+        if query:
+            cursor.execute(query)
+            for (submission_id, arch, product, release, host, log_url, testsuite, test_time, failed, testcase, kernel_version) in cursor:
+                if field == 'testsuite':
+                    dataset.add(testsuite)
+                if field == 'arch':
+                    dataset.add(arch)
+                if field == 'host':
+                    dataset.add(host)
+                if field == 'testcase':
+                    dataset.add(testcase)
+            return
+
+
 
         query = ("SELECT * from performance_view")
         cursor.execute(query)
-        for (submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version) in cursor:
-            arch_set.add(arch)
-            host_set.add(host)
-            testsuite_set.add(testsuite)
+        for (submission_id, arch, product, release, host, log_url, testsuite, test_time, failed, testcase, kernel_version) in cursor:
             testcase_set.add(testcase)
             #print("submission_id={}, arch={}, product={}, release={}, host={}, log_url={}, testsuite={}, testcase={}, kernel_version={}".format(submission_id, arch, product, release, host, log_url, testsuite, testcase, kernel_version))
 
 #Don't do create object at here.
             #TestCase(submission_id, arch, product, release, host, log_url, testsuite, test_time, testcase, kernel_version)
 
-        query = ("SELECT distinct `kernel_version`, `product`, `release` from performance_view")
-        cursor.execute(query)
+        query2 = ("SELECT distinct `kernel_version`, `product`, `release` from performance_view")
+        cursor.execute(query2)
         i=0
         table=list()
         for (kernel_version, product, release) in cursor:
@@ -524,25 +535,38 @@ if kernel_compare_list and product_compare_list and release_compare_list:
         print(",".join([k,p,r]))
         compare_products_list.append([k,p,r])
 
-read_database_init_data_pool()
+read_database_init_data_pool(0,0,0)
 
 
 
 if not compare_products_list:
     sys.exit(1)
 
+
 print(testcase_set)
 if not testcase_compare_list:
     testcase_input = input("[testcase]:")
     testcase_compare_list = testcase_input.split(",")
+
+
+query3 = ("SELECT * from performance_view where `testcase` = '" + testcase_input +"'")
+read_database_init_data_pool(query3, testsuite_set, "testsuite")
+
+
+
 print(testsuite_set)
 if not testsuite_compare_list:
     testsuite_input = input("[testsuite]:")
     testsuite_compare_list = testsuite_input.split(",")
+
+query3 = ("SELECT * from performance_view where `testcase` = '" + testcase_input +"'" + "and `testsuite` = '" + testsuite_input + "'")
+read_database_init_data_pool(query3, host_set, "host")
 print(host_set)
 if not host_compare_list:
     host_input = input("[host]:")
     host_compare_list = host_input.split(",")
+query3 = ("SELECT * from performance_view where `testcase` = '" + testcase_input +"'" + "and `testsuite` = '" + testsuite_input + "'" + "and `host` = '" + host_input +"'")
+read_database_init_data_pool(query3, arch_set, "arch")
 print(arch_set)
 if not arch_compare_list:
     arch_input = input("[arch]:")
@@ -693,7 +717,7 @@ for l in range(1, a, 1):
 format_football(football)
 
 print(football)
-code.interact(local=locals())
+#code.interact(local=locals())
 
 
     #for testcase in TestCase_gloale_list:
